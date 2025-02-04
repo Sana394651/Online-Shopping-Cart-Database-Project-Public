@@ -1,95 +1,171 @@
--- SELECT * FROM COMMAND
+DROP VIEW product_sales_for_2016;
+DROP VIEW products_above_average_price;
 
--- query the address, starttime and endtime of the servicepoints in the same city as userid 5   
-SELECT streetaddr,starttime,endtime
-FROM ServicePoint
-WHERE ServicePoint.city IN (SELECT Address.city FROM Address WHERE userid=5);
-
-
--- query the information of laptops
-SELECT *
-FROM Product
-WHERE type='laptop';
-
--- query the total quantity of products from store with storeid 8 in the shopping cart
-SELECT SUM(quantity) AS totalQuantity
-FROM Save_to_Shopping_Cart
-WHERE Save_to_Shopping_Cart.pid IN (SELECT Product.pid FROM Product WHERE sid=8);
-
--- query the name and address of orders delivered on 2017-02-17
-SELECT name, streetaddr, city
-FROM Address
-WHERE addrid IN (SELECT addrid FROM Deliver_To WHERE TimeDelivered = '2017-02-17');
-
-
- -- query the comments of product 12345678 
- SELECT *
- FROM Comments
- WHERE pid = 12345678; 
-
--- ------------------------------------------- --
--- Data Modification
-
--- Insert the user id of sellers whose name starts with A into buyer
-INSERT INTO buyer
-SELECT * FROM seller
-WHERE userid IN (SELECT userid FROM users WHERE name LIKE 'A%');
-
--- Update the payment state of orders to unpaid which created after year 2017 and with total amount greater than 50.
-
-UPDATE Orders
-SET paymentState = 'Unpaid'
-WHERE creationTime > '2017-01-01' AND totalAmount > 50;
-
--- Update the name and contact phone number of address where the provice is Quebec and city is montreal.
-
-UPDATE address
-SET name = 'Awesome Lady', contactPhoneNumber ='1234567'
-WHERE province = 'Quebec' AND city = 'Montreal';
-
--- Delete the store which opened before year 2017
-DELETE FROM save_to_shopping_cart
-WHERE addTime < '2017-01-01';
-
--- ------------------------------------------- --
--- Views 
--- Create view of all products whose price above average price.
-
-CREATE VIEW Products_Above_Average_Price AS
-SELECT pid, name, price 
-FROM Product
-WHERE price > (SELECT AVG(price) FROM Product);
-
-select * from products_above_average_price;
-
--- Update the view
-UPDATE Products_Above_Average_Price
-SET price = 1
-WHERE name = 'GoPro HERO5';
-
--- Create view of all products sales in 2016.
-CREATE VIEW Product_Sales_For_2016 AS
-SELECT pid, name, price
-FROM Product
-WHERE pid IN (SELECT pid FROM OrderItem WHERE itemid IN 
-              (SELECT itemid FROM Contain WHERE orderNumber IN
-               (SELECT orderNumber FROM Payment WHERE payTime > '2016-01-01' AND payTime < '2016-12-31')
-              )
-             );
-
-SELECT * FROM product_sales_for_2016;
-
--- Update the view
-UPDATE product_sales_for_2016
-SET price = 2
-WHERE name = 'GoPro HERO5';
-
--- ------------------------------------------- --
--- Check Constraints
-
--- Check whether the products saved to the shopping cart after the year 2017 has quantities of smaller than 10.
-
+DROP TABLE Deliver_To;
+DROP TABLE Contain;
+DROP TABLE Payment;
+DROP TABLE Manage;
 DROP TABLE Save_to_Shopping_Cart;
+DROP TABLE After_Sales_Service_At;
+
+DROP TABLE Address;
+DROP TABLE Orders;
+DROP TABLE OrderItem;
+DROP TABLE CreditCard;
+DROP TABLE DebitCard;
+DROP TABLE BankCard;
+DROP TABLE Seller;
+DROP TABLE Comments;
+DROP TABLE Buyer;
+DROP TABLE Users;
+DROP TABLE Product;
+DROP TABLE Store;
+DROP TABLE ServicePoint;
+DROP TABLE Brand;
+
+-- Entity
+CREATE TABLE Users
+(
+    userid INT NOT NULL
+    ,name VARCHAR(20)
+    ,phoneNumber VARCHAR(20)
+    ,PRIMARY KEY(userid)
+);
+
+CREATE TABLE Buyer
+(
+    userid INT NOT NULL
+    ,PRIMARY KEY(userid)
+    ,FOREIGN KEY(userid) REFERENCES Users(userid)
+);
+
+CREATE TABLE Seller
+(
+    userid INT NOT NULL
+    ,PRIMARY KEY(userid)
+    ,FOREIGN KEY(userid) REFERENCES Users(userid)
+);
+
+CREATE TABLE BankCard
+(
+    cardNumber VARCHAR(25) NOT NULL
+    ,expiryDate DATE
+    ,bank VARCHAR(20)
+    ,PRIMARY KEY(cardNumber)
+);
+
+CREATE TABLE
+CreditCard
+(
+    cardNumber VARCHAR(25) NOT NULL
+    ,userid INT NOT NULL
+    ,organization VARCHAR(20)
+    ,PRIMARY KEY(cardNumber)
+    ,FOREIGN KEY(cardNumber) REFERENCES BankCard(cardNumber)
+    ,FOREIGN KEY(userid) REFERENCES Users(userid)
+);
+
+CREATE TABLE DebitCard
+(
+    cardNumber VARCHAR(25) NOT NULL
+    ,userid INT NOT NULL
+    ,PRIMARY KEY(cardNumber)
+    ,FOREIGN KEY(cardNumber) REFERENCES BankCard(cardNumber)
+    ,FOREIGN KEY(userid) REFERENCES Users(userid)
+);
+
+CREATE TABLE Address
+(
+    addrid INT NOT NULL
+    ,userid INT NOT NULL
+    ,name VARCHAR(50)
+    ,contactPhoneNumber VARCHAR(20)
+    ,province VARCHAR(100)
+    ,city VARCHAR(100)
+    ,streetaddr VARCHAR(100)
+    ,postCode VARCHAR(12)
+    ,PRIMARY KEY(addrid)
+    ,FOREIGN KEY(userid) REFERENCES Users(userid)
+);
+
+CREATE TABLE Store
+(
+    sid INT NOT NULL
+    ,name VARCHAR(20)
+    ,province VARCHAR(20)
+    ,city VARCHAR(20)
+    ,streetaddr VARCHAR(20)
+    ,customerGrade INT
+    ,startTime DATE
+    ,PRIMARY KEY(sid)
+);
+
+CREATE TABLE Brand
+(
+    brandName VARCHAR(20) NOT NULL
+    ,PRIMARY KEY (brandName)
+);
+
+CREATE TABLE Product
+(
+    pid INT NOT NULL
+    ,sid INT NOT NULL
+    ,brand VARCHAR(50) NOT NULL
+    ,name VARCHAR(100)
+    ,type VARCHAR(50)
+    ,modelNumber VARCHAR(50)
+    ,color VARCHAR(50)
+    ,amount INT
+    ,price INT
+    ,PRIMARY KEY(pid)
+    ,FOREIGN KEY(sid) REFERENCES Store(sid)
+    ,FOREIGN KEY(brand) REFERENCES Brand(brandName)
+);
+
+CREATE TABLE OrderItem
+(
+    itemid INT NOT NULL
+    ,pid INT NOT NULL
+    ,price INT
+    ,creationTime DATE
+    ,PRIMARY KEY(itemid)
+    ,FOREIGN KEY(pid) REFERENCES Product(pid)
+);
+
+CREATE TABLE Orders
+(
+    orderNumber INT NOT NULL
+    ,paymentState VARCHAR(12)
+    ,creationTime DATE
+    ,totalAmount INT
+    ,PRIMARY KEY (orderNumber)
+);
+
+
+CREATE TABLE Comments  -- Weak Entity
+(
+    creationTime DATE NOT NULL
+    ,userid INT NOT NULL
+    ,pid INT NOT NULL
+    ,grade FLOAT
+    ,content VARCHAR(500)
+    ,PRIMARY KEY(creationTime,userid,pid)
+    ,FOREIGN KEY(userid) REFERENCES Buyer(userid)
+    ,FOREIGN KEY(pid) REFERENCES Product(pid)
+);
+
+CREATE TABLE ServicePoint
+(
+    spid INT NOT NULL
+    ,streetaddr VARCHAR(40)
+    ,city VARCHAR(30)
+    ,province VARCHAR(20)
+    ,startTime VARCHAR(20)
+    ,endTime VARCHAR(20)
+    ,PRIMARY KEY(spid)
+);
+-- Relationship
+
 CREATE TABLE Save_to_Shopping_Cart
 (
     userid INT NOT NULL
@@ -99,26 +175,53 @@ CREATE TABLE Save_to_Shopping_Cart
     ,PRIMARY KEY (userid,pid)
     ,FOREIGN KEY(userid) REFERENCES Buyer(userid)
     ,FOREIGN KEY(pid) REFERENCES Product(pid)
-    ,CHECK (quantity <= 10 OR addTime > '2017-01-01')
 );
 
-INSERT INTO Save_to_Shopping_Cart VALUES(18,67890123,'2016-11-23',9);
-INSERT INTO Save_to_Shopping_Cart VALUES(24,67890123,'2017-02-22',8);
-INSERT INTO Save_to_Shopping_Cart VALUES(5,56789012,'2016-10-17',11); -- error
-
--- Check whether the ordered item has 0 to 10 quantities
-
-DROP VIEW Product_Sales_For_2016; -- If create this view before we need to drop it first
-DROP TABLE Contain;
 CREATE TABLE Contain
 (
     orderNumber INT NOT NULL
     ,itemid INT NOT NULL
-    ,quantity INT CHECK(quantity > 0 AND quantity <= 10)
+    ,quantity INT
     ,PRIMARY KEY (orderNumber,itemid)
     ,FOREIGN KEY(orderNumber) REFERENCES Orders(orderNumber)
     ,FOREIGN KEY(itemid) REFERENCES OrderItem(itemid)
 );
 
-INSERT INTO Contain VALUES (76023921,23543245,11); -- error
-INSERT INTO Contain VALUES (23924831,65738929,8);
+CREATE TABLE Payment
+(
+    orderNumber INT NOT NULL
+    ,creditcardNumber VARCHAR(25) NOT NULL
+    ,payTime DATE
+    ,PRIMARY KEY(orderNumber,creditcardNumber)
+    ,FOREIGN KEY(orderNumber) REFERENCES Orders(orderNumber)
+    ,FOREIGN KEY(creditcardNumber) REFERENCES CreditCard(cardNumber)
+);
+
+CREATE TABLE Deliver_To
+(
+    addrid INT NOT NULL
+    ,orderNumber INT NOT NULL
+    ,TimeDelivered DATE
+    ,PRIMARY KEY(addrid,orderNumber)
+    ,FOREIGN KEY(addrid) REFERENCES Address(addrid)
+    ,FOREIGN KEY(orderNumber) REFERENCES Orders(orderNumber)
+);
+
+CREATE TABLE Manage
+(
+    userid INT NOT NULL
+    ,sid INT NOT NULL
+    ,SetUpTime DATE
+    ,PRIMARY KEY(userid,sid)
+    ,FOREIGN KEY(userid) REFERENCES Seller(userid)
+    ,FOREIGN KEY(sid) REFERENCES Store
+);
+
+CREATE TABLE After_Sales_Service_At
+(
+    brandName VARCHAR(20) NOT NULL
+    ,spid INT NOT NULL
+    ,PRIMARY KEY(brandName, spid)
+    ,FOREIGN KEY(brandName) REFERENCES Brand (brandName)
+    ,FOREIGN KEY(spid) REFERENCES ServicePoint(spid)
+);
